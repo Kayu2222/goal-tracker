@@ -512,7 +512,7 @@ function renderTaskCard({ pageId, name, freq, count, dimName, dimIcon, period, i
 function renderSlide(period) {
   const periodKey = { 0: "daily", 1: "weekly", 2: "monthly", 3: "quarterly" }[period];
   const targetIds = { daily: "daily-tasks", weekly: "weekly-tasks", monthly: "monthly-tasks", quarterly: "quarterly-tasks" };
-  const el = document.getElementById(targetIds[period]);
+  const el = document.getElementById(targetIds[periodKey]); 
   if (!el) return;
 
   let html = "";
