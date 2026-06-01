@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Goal Tracker"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<link rel="manifest" href="manifest.json"/>
+<title>Goal Tracker</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0f0f8;
+    --text-dim: rgba(240,240,248,0.45);
+    --accent: #7c6dfa;
+    --accent-glow: rgba(124,109,250,0.3);
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.15);
+    --amber: #fbbf24;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Pro Display', -apple-system, 'Hiragino Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex; flex-direction: column;
+    height: 100dvh;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* ── Header ── */
+  .header {
+    padding: 16px 20px 0;
+    flex-shrink: 0;
+  }
+
+  .header-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .app-title {
+    font-size: 13px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-dim);
+  }
+
+  .date-badge {
+    font-size: 12px; color: var(--text-dim);
+    background: var(--surface2); border-radius: 20px;
+    padding: 4px 10px;
+  }
+
+  /* ── Tab Bar ── */
+  .tabs {
+    display: flex; gap: 6px;
+    padding: 12px 20px;
+    flex-shrink: 0;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex-shrink: 0;
+    padding: 8px 18px; border-radius: 100px;
+    font-size: 14px; font-weight: 600;
+    border: 1.5px solid var(--border);
+    background: transparent; color: var(--text-dim);
+    cursor: pointer; transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab.active {
+    background: var(--accent); color: #fff;
+    border-color: transparent;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  /* ── Slides ── */
+  .slides-wrapper {
+    flex: 1; overflow: hidden; position: relative;
+  }
+
+  .slides {
+    display: flex; height: 100%;
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform;
+  }
+
+  .slide {
+    width: 100%; flex-shrink: 0;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 4px 20px 24px;
+    scrollbar-width: none;
+  }
+  .slide::-webkit-scrollbar { display: none; }
+
+  /* ── Section Header ── */
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim);
+    margin: 16px 0 10px;
+  }
+
+  /* ── Task Card ── */
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 14px;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative; overflow: hidden;
+  }
+  .task-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--accent); opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 3px 0 0 3px;
+  }
+  .task-card.completed { background: var(--green-dim); border-color: rgba(74,222,128,0.2); }
+  .task-card.completed::before { background: var(--green); opacity: 1; }
+  .task-card.loading { opacity: 0.6; pointer-events: none; }
+
+  .task-check {
+    width: 24px; height: 24px; flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .task-card.completed .task-check {
+    background: var(--green); border-color: var(--green);
+  }
+  .task-check svg { opacity: 0; transform: scale(0); transition: all 0.2s; }
+  .task-card.completed .task-check svg { opacity: 1; transform: scale(1); }
+
+  .task-info { flex: 1; min-width: 0; }
+  .task-name {
+    font-size: 14px; font-weight: 500; line-height: 1.4;
+    color: var(--text);
+  }
+  .task-card.completed .task-name { color: var(--text-dim); text-decoration: line-through; }
+
+  .task-meta {
+    display: flex; align-items: center; gap: 6px; margin-top: 4px;
+  }
+  .task-freq {
+    font-size: 11px; color: var(--text-dim);
+    background: var(--surface2); padding: 2px 7px; border-radius: 20px;
+  }
+  .task-dim-tag {
+    font-size: 11px; color: var(--accent); opacity: 0.8;
+  }
+
+  .task-count {
+    font-size: 13px; font-weight: 700; color: var(--accent);
+    background: var(--surface2); min-width: 28px; height: 28px;
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .task-card.completed .task-count { color: var(--green); }
+
+  /* ── Spinner ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: calc(24px + var(--safe-bottom));
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); color: var(--text);
+    padding: 10px 20px; border-radius: 100px;
+    font-size: 13px; font-weight: 500;
+    border: 1px solid var(--border);
+    opacity: 0; transition: all 0.3s;
+    pointer-events: none; white-space: nowrap;
+    z-index: 999; backdrop-filter: blur(12px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Dashboard ── */
+  .dashboard-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-top: 8px;
+  }
+  .dim-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .dim-card-icon { font-size: 22px; }
+  .dim-card-name { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+  .dim-card-rate {
+    font-size: 24px; font-weight: 700;
+    color: var(--text);
+  }
+  .dim-card-rate.good { color: var(--green); }
+  .dim-card-rate.mid { color: var(--amber); }
+
+  .progress-bar {
+    height: 4px; background: var(--surface2);
+    border-radius: 2px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent);
+    border-radius: 2px; transition: width 0.5s ease;
+  }
+  .progress-fill.good { background: var(--green); }
+  .progress-fill.mid { background: var(--amber); }
+
+  .overall-card {
+    background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
+    border-radius: 18px; padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 8px 32px var(--accent-glow);
+  }
+  .overall-label { font-size: 12px; font-weight: 600; opacity: 0.8; letter-spacing: 0.08em; }
+  .overall-rate { font-size: 48px; font-weight: 800; line-height: 1; margin: 4px 0; }
+  .overall-sub { font-size: 13px; opacity: 0.75; }
+
+  /* ── Loading State ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+    border-radius: 14px; height: 72px; margin-bottom: 10px;
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ── Pull indicator ── */
+  .period-hint {
+    text-align: center; font-size: 12px; color: var(--text-dim);
+    padding: 8px 0; opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <span class="app-title">🎯 Goal Tracker</span>
+      <span class="date-badge" id="dateBadge"></span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" onclick="switchTab(0)">今日</button>
+    <button class="tab" onclick="switchTab(1)">本週</button>
+    <button class="tab" onclick="switchTab(2)">本月</button>
+    <button class="tab" onclick="switchTab(3)">本季</button>
+    <button class="tab" onclick="switchTab(4)">總覽</button>
+  </div>
+
+  <!-- Slides -->
+  <div class="slides-wrapper">
+    <div class="slides" id="slides">
+      <!-- 今日 -->
+      <div class="slide" id="slide-0">
+        <div class="period-hint">每天必做清單</div>
+        <div id="daily-tasks"></div>
+      </div>
+      <!-- 本週 -->
+      <div class="slide" id="slide-1">
+        <div class="period-hint">本週應完成事項</div>
+        <div id="weekly-tasks"></div>
+      </div>
+      <!-- 本月 -->
+      <div class="slide" id="slide-2">
+        <div class="period-hint">本月應完成事項</div>
+        <div id="monthly-tasks"></div>
+      </div>
+      <!-- 本季 -->
+      <div class="slide" id="slide-3">
+        <div class="period-hint">本季應完成事項</div>
+        <div id="quarterly-tasks"></div>
+      </div>
+      <!-- 總覽 -->
+      <div class="slide" id="slide-4">
+        <div class="overall-card">
+          <div class="overall-label">📊 年度整體完成率</div>
+          <div class="overall-rate" id="overallRate">--</div>
+          <div class="overall-sub" id="overallSub">載入中…</div>
+        </div>
+        <div class="dashboard-grid" id="dashboardGrid">
+          <div class="skeleton"></div><div class="skeleton"></div>
+          <div class="skeleton"></div><div class="skeleton"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// ⚙️  CONFIG — 改成你的 Cloudflare Worker URL
+// ═══════════════════════════════════════
+const WORKER_URL = "https://notion-proxy.ou1993072222.workers.dev";
+
+// ── 8 大維度 & 完成率追蹤 DB ──
+const DIMENSIONS = [
+  { id: "career",   name: "職涯晉升策略", icon: "📈",
+    trackDb: "2f98136c-1daf-4c91-9f61-a1f98c4ab286",
+    actionDb: "b2fdd728-b77a-4c19-b849-6a3914258532" },
+  { id: "tech",     name: "技術能力提升", icon: "💻",
+    trackDb: "17c6f958-a226-4017-a1fc-e4c8aaad66aa",
+    actionDb: "e3144b94-3d67-4dd3-9a23-184676fd5de0" },
+  { id: "finance",  name: "財務投資理財", icon: "💰",
+    trackDb: "887dc9a9-7021-4791-a70e-6973f06de160",
+    actionDb: "d5081fbb-9b1d-488d-b682-ab79e74739a2" },
+  { id: "startup",  name: "創業/副業經營", icon: "🚀",
+    trackDb: "d3704eeb-60da-40f5-ae44-2341ce277d01",
+    actionDb: "f204f180-f59c-4681-a9dc-b646029ce261" },
+  { id: "network",  name: "人脈與社群建立", icon: "🌐",
+    trackDb: "b0f72029-977c-4027-8873-0d622126e3b4",
+    actionDb: "241cc8f9-b20e-4fa3-83fd-19fc7cf8ba52" },
+  { id: "english",  name: "英語/國際化能力", icon: "🌏",
+    trackDb: "2f911704-1afc-4ac0-bde5-86e87598fa72",
+    actionDb: "353adec1-b7d1-4738-a8f8-b332dba6dbec" },
+  { id: "health",   name: "身心健康管理", icon: "💪",
+    trackDb: "55c4ec33-9762-49b4-b2f4-fe0b6d508d1a",
+    actionDb: "eb25112a-3583-4360-bc9e-59ac0a2b759b" },
+  { id: "learning", name: "學習與知識系統", icon: "📚",
+    trackDb: "2c1c48ed-748a-402c-b5bb-c1090d45f728",
+    actionDb: "cb014cbb-d6eb-409b-a387-5799aa00e109" },
+];
+
+// ── 週期標籤 mapping（對應 Notion DB 裡的「週期」欄位值）──
+const PERIOD_LABELS = {
+  daily:     null,        // 每天任務沒有追蹤週期，直接看行動
+  weekly:    "📅 本週",
+  monthly:   "📅 本月",
+  quarterly: "📅 本季",
+  yearly:    "📋 年度累積",
+};
+
+// ── 頻率 → 屬於哪個週期 ──
+const FREQ_TO_PERIOD = {
+  "每天": "daily",
+  "每週": "weekly",
+  "每月": "monthly",
+  "每季": "quarterly",
+  "每年": "yearly",
+  "持續": "weekly",  // 持續型任務放在本週
+};
+
+// ── 狀態 ──
+let currentTab = 0;
+let actionData = {};   // { dimId: [{ pageId, name, freq, dimId, count }] }
+let trackData  = {};   // { dimId: [{ pageId, period, target, done }] }
+let todayChecked = {}; // localStorage key 今天完成的每日任務
+
+// ── Notion API via Worker ──
+async function notionQuery(dbId, filter) {
+  const body = filter ? { filter } : {};
+  const res = await fetch(`${WORKER_URL}/notion/databases/${dbId}/query`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  return json.results || [];
+}
+
+async function notionPatch(pageId, props) {
+  const res = await fetch(`${WORKER_URL}/notion/pages/${pageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ properties: props }),
+  });
+  return res.json();
+}
+
+// ── Helpers ──
+function prop(page, key, type) {
+  const p = page.properties[key];
+  if (!p) return null;
+  if (type === "title") return p.title?.[0]?.plain_text || "";
+  if (type === "number") return p.number ?? 0;
+  if (type === "select") return p.select?.name || "";
+  if (type === "formula") return p.formula?.number ?? 0;
+  return null;
+}
+
+function getPeriodKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+}
+
+function loadChecked() {
+  try {
+    const key = `checked_${getPeriodKey()}`;
+    todayChecked = JSON.parse(localStorage.getItem(key) || "{}");
+  } catch { todayChecked = {}; }
+}
+function saveChecked() {
+  const key = `checked_${getPeriodKey()}`;
+  localStorage.setItem(key, JSON.stringify(todayChecked));
+}
+
+function showToast(msg, ok=true) {
+  const t = document.getElementById("toast");
+  t.textContent = (ok ? "✅ " : "⚠️ ") + msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// ── Date Badge ──
+function setDateBadge() {
+  const now = new Date();
+  const d = now.toLocaleDateString("zh-TW", { month: "long", day: "numeric", weekday: "short" });
+  document.getElementById("dateBadge").textContent = d;
+}
+
+// ── Load All Data ──
+async function loadAllData() {
+  // Load action DBs for all dimensions
+  await Promise.all(DIMENSIONS.map(async dim => {
+    const rows = await notionQuery(dim.actionDb);
+    actionData[dim.id] = rows.map(p => ({
+      pageId: p.id,
+      name: prop(p, "行動名稱", "title"),
+      freq: prop(p, "頻率", "select"),
+      count: prop(p, "年度完成次數", "number") || 0,
+      target: prop(p, "年度目標次數", "number") || 0,
+      dimId: dim.id,
+      dimName: dim.name,
+      dimIcon: dim.icon,
+    }));
+  }));
+
+  // Load tracking DBs for all dimensions
+  await Promise.all(DIMENSIONS.map(async dim => {
+    const rows = await notionQuery(dim.trackDb);
+    trackData[dim.id] = rows.map(p => ({
+      pageId: p.id,
+      period: prop(p, "週期", "title"),
+      target: prop(p, "目標次數", "number") || 0,
+      done:   prop(p, "完成次數", "number") || 0,
+      rate:   prop(p, "完成率%", "formula") || 0,
+      dimId: dim.id,
+      dimName: dim.name,
+      dimIcon: dim.icon,
+    }));
+  }));
+}
+
+// ── Render ──
+function renderTaskCard({ pageId, name, freq, count, dimName, dimIcon, period, isDaily }) {
+  const checked = isDaily ? !!todayChecked[pageId] : false;
+  return `
+  <div class="task-card ${checked ? 'completed' : ''}" id="card-${pageId}">
+    ${isDaily ? `
+    <button class="task-check" onclick="toggleDaily('${pageId}')" aria-label="完成">
+      <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+        <path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    ` : `
+    <button class="task-check" onclick="markDone('${pageId}', ${count}, this)" aria-label="完成">
+      <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+        <path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    `}
+    <div class="task-info">
+      <div class="task-name">${name}</div>
+      <div class="task-meta">
+        <span class="task-freq">${freq}</span>
+        <span class="task-dim-tag">${dimIcon} ${dimName}</span>
+      </div>
+    </div>
+    ${!isDaily ? `<div class="task-count" id="count-${pageId}">${count}</div>` : ''}
+  </div>`;
+}
+
+function renderSlide(period) {
+  const periodKey = { 0: "daily", 1: "weekly", 2: "monthly", 3: "quarterly" }[period];
+  const targetIds = { daily: "daily-tasks", weekly: "weekly-tasks", monthly: "monthly-tasks", quarterly: "quarterly-tasks" };
+  const el = document.getElementById(targetIds[period]);
+  if (!el) return;
+
+  let html = "";
+  DIMENSIONS.forEach(dim => {
+    const actions = (actionData[dim.id] || []).filter(a => FREQ_TO_PERIOD[a.freq] === periodKey);
+    if (!actions.length) return;
+    html += `<div class="section-label">${dim.icon} ${dim.name}</div>`;
+    actions.forEach(a => {
+      html += renderTaskCard({ ...a, isDaily: periodKey === "daily" });
+    });
+  });
+
+  el.innerHTML = html || `<div class="period-hint" style="margin-top:40px">這個週期沒有任務 🎉</div>`;
+}
+
+function renderDashboard() {
+  const grid = document.getElementById("dashboardGrid");
+  let totalDone = 0, totalTarget = 0;
+
+  const cards = DIMENSIONS.map(dim => {
+    // 找年度累積那行
+    const yearly = (trackData[dim.id] || []).find(r =>
+      r.period.includes("累積") || r.period.includes("年度")
+    );
+    const done = yearly?.done || 0;
+    const target = yearly?.target || 0;
+    const rate = target > 0 ? Math.round(done / target * 100) : 0;
+    totalDone += done; totalTarget += target;
+
+    const cls = rate >= 70 ? "good" : rate >= 40 ? "mid" : "";
+    const fillCls = rate >= 70 ? "good" : rate >= 40 ? "mid" : "";
+    return `
+    <div class="dim-card">
+      <div class="dim-card-icon">${dim.icon}</div>
+      <div class="dim-card-name">${dim.name}</div>
+      <div class="dim-card-rate ${cls}">${rate}%</div>
+      <div class="progress-bar">
+        <div class="progress-fill ${fillCls}" style="width:${rate}%"></div>
+      </div>
+    </div>`;
+  });
+
+  grid.innerHTML = cards.join("");
+
+  const overall = totalTarget > 0 ? Math.round(totalDone / totalTarget * 100) : 0;
+  document.getElementById("overallRate").textContent = `${overall}%`;
+  document.getElementById("overallSub").textContent =
+    `累積完成 ${totalDone} / ${totalTarget} 次`;
+}
+
+// ── Toggle Daily (localStorage only) ──
+function toggleDaily(pageId) {
+  const card = document.getElementById(`card-${pageId}`);
+  if (!card) return;
+  const wasChecked = !!todayChecked[pageId];
+  todayChecked[pageId] = !wasChecked;
+  saveChecked();
+  card.classList.toggle("completed", !wasChecked);
+  if (!wasChecked) showToast("已記錄！");
+}
+
+// ── Mark Done (write to Notion) ──
+async function markDone(pageId, currentCount, btn) {
+  const card = document.getElementById(`card-${pageId}`);
+  const countEl = document.getElementById(`count-${pageId}`);
+  if (!card || card.classList.contains("loading")) return;
+
+  card.classList.add("loading");
+  // Replace check button with spinner
+  btn.innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const newCount = currentCount + 1;
+    await notionPatch(pageId, {
+      "年度完成次數": { number: newCount }
+    });
+    // Update local
+    countEl.textContent = newCount;
+    card.classList.add("completed");
+    showToast("已寫入 Notion！");
+
+    // Update in-memory
+    Object.values(actionData).flat().forEach(a => {
+      if (a.pageId === pageId) a.count = newCount;
+    });
+
+    // Reset after 1.5s visual feedback
+    setTimeout(() => {
+      card.classList.remove("completed");
+      btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+        <path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      </svg>`;
+    }, 1500);
+
+  } catch(e) {
+    showToast("寫入失敗，請重試", false);
+    btn.innerHTML = `<svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+      <path d="M1 5L4.5 8.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+  } finally {
+    card.classList.remove("loading");
+  }
+}
+
+// ── Tab Switch ──
+function switchTab(idx) {
+  currentTab = idx;
+  document.querySelectorAll(".tab").forEach((t, i) => t.classList.toggle("active", i === idx));
+  document.getElementById("slides").style.transform = `translateX(-${idx * 100}%)`;
+
+  // Lazy render
+  if (idx < 4) renderSlide(idx);
+  if (idx === 4) renderDashboard();
+}
+
+// ── Swipe ──
+let touchStartX = 0;
+const slidesEl = document.getElementById("slides");
+slidesEl.addEventListener("touchstart", e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+slidesEl.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 60) {
+    const next = dx < 0 ? Math.min(currentTab + 1, 4) : Math.max(currentTab - 1, 0);
+    if (next !== currentTab) switchTab(next);
+  }
+}, { passive: true });
+
+// ── Init ──
+async function init() {
+  setDateBadge();
+  loadChecked();
+
+  // Show skeletons while loading
+  ["daily-tasks","weekly-tasks","monthly-tasks","quarterly-tasks"].forEach(id => {
+    document.getElementById(id).innerHTML =
+      '<div class="skeleton"></div>'.repeat(3);
+  });
+
+  await loadAllData();
+  renderSlide(0); // render current tab
+}
+
+init();
+</script>
+</body>
+</html>
